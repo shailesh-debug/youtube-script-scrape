@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 import shutil
 import subprocess
@@ -224,7 +225,8 @@ def _write_cookies_file(tmpdir: str, cookies: str) -> Path | None:
         return None
 
     cookie_path = Path(tmpdir) / "youtube_cookies.txt"
-    cookie_path.write_text(cookies.strip() + "\n", encoding="utf-8")
+    normalized = cookies.replace("\r\n", "\n").replace("\r", "\n").lstrip("\ufeff").strip()
+    cookie_path.write_text(normalized + "\n", encoding="utf-8")
     return cookie_path
 
 
@@ -232,18 +234,95 @@ def _yt_dlp_failure_message(stderr: str) -> str:
     text = re.sub(r"\s+", " ", stderr).strip()
     if "Sign in to confirm" in text or "not a bot" in text:
         return "YouTube blocked anonymous audio download. Add YOUTUBE_COOKIES on Render."
+    if "Requested format is not available" in text:
+        return "YouTube did not expose a downloadable audio format for this video."
     if not text:
         return "audio download failed"
     return text[:240]
+
+
+def _yt_dlp_base_args(cookie_path: Path | None = None) -> list[str]:
+    args = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--extractor-args",
+        "youtube:formats=missing_pot",
+    ]
+    if cookie_path:
+        args.extend(["--cookies", str(cookie_path)])
+    return args
+
+
+def _parse_json3_caption(path: Path) -> str:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    pieces: list[str] = []
+    for event in data.get("events", []):
+        for segment in event.get("segs", []) or []:
+            text = segment.get("utf8", "")
+            if text:
+                pieces.append(text)
+    return clean_transcript("".join(pieces))
+
+
+def _parse_vtt_caption(path: Path) -> str:
+    lines = []
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        stripped = line.strip()
+        if (
+            not stripped
+            or stripped == "WEBVTT"
+            or "-->" in stripped
+            or stripped.startswith(("Kind:", "Language:"))
+            or re.match(r"^\d+$", stripped)
+        ):
+            continue
+        lines.append(re.sub(r"<[^>]+>", "", stripped))
+    return clean_transcript(" ".join(lines))
+
+
+def get_caption_transcript(video_id: str, tmpdir: str, cookies: str = "") -> str:
+    cookie_path = _write_cookies_file(tmpdir, cookies)
+    output = Path(tmpdir) / "captions.%(ext)s"
+    cmd = [
+        *_yt_dlp_base_args(cookie_path),
+        "--skip-download",
+        "--write-subs",
+        "--write-auto-subs",
+        "--sub-langs",
+        "en.*",
+        "--sub-format",
+        "json3/vtt",
+        "--no-playlist",
+        "--no-warnings",
+        "-o",
+        str(output),
+        f"https://www.youtube.com/watch?v={video_id}",
+    ]
+    subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+    caption_files = sorted(
+        path
+        for path in Path(tmpdir).glob("captions*")
+        if path.suffix.lower() in {".json3", ".vtt"}
+    )
+    for path in caption_files:
+        try:
+            transcript = _parse_json3_caption(path) if path.suffix.lower() == ".json3" else _parse_vtt_caption(path)
+            if transcript:
+                return transcript
+        except Exception:
+            continue
+    return ""
 
 
 def download_audio(video_id: str, tmpdir: str, cookies: str = "") -> tuple[Path | None, str]:
     output = Path(tmpdir) / "audio.%(ext)s"
     cookie_path = _write_cookies_file(tmpdir, cookies)
     cmd = [
-        sys.executable,
-        "-m",
-        "yt_dlp",
+        *_yt_dlp_base_args(cookie_path),
+        "-f",
+        "bestaudio[ext=m4a]/bestaudio/best",
         "--extract-audio",
         "--audio-format",
         "mp3",
@@ -255,8 +334,6 @@ def download_audio(video_id: str, tmpdir: str, cookies: str = "") -> tuple[Path 
         str(output),
         f"https://www.youtube.com/watch?v={video_id}",
     ]
-    if cookie_path:
-        cmd[3:3] = ["--cookies", str(cookie_path)]
 
     result = subprocess.run(
         cmd,
@@ -276,6 +353,10 @@ def transcribe_with_groq(video_id: str, groq_api_key: str, youtube_cookies: str 
 
     tmpdir = tempfile.mkdtemp()
     try:
+        caption_transcript = get_caption_transcript(video_id, tmpdir, youtube_cookies)
+        if caption_transcript:
+            return caption_transcript
+
         audio_path, failure_message = download_audio(video_id, tmpdir, youtube_cookies)
         if not audio_path:
             return f"[No transcript - {failure_message}]"
