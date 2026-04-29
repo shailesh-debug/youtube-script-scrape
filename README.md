@@ -12,7 +12,7 @@ Private dashboard for generating `.docx` reports from viral YouTube Shorts or vi
 ## Local Backend
 
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 uvicorn backend.main:app --reload
 ```
 
