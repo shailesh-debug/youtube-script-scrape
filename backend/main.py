@@ -90,6 +90,7 @@ def health() -> dict[str, bool]:
         "ok": True,
         "youtube_api_key": bool(settings.youtube_api_key),
         "groq_api_key": bool(settings.groq_api_key),
+        "youtube_cookies": bool(settings.youtube_cookies),
     }
 
 
