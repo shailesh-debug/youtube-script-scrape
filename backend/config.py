@@ -42,6 +42,24 @@ def _detect_key(lines: list[str], env_name: str, prefixes: tuple[str, ...]) -> s
     return ""
 
 
+def summarize_youtube_cookies(cookies: str) -> dict[str, int | bool]:
+    lines = [line.strip() for line in cookies.replace("\r\n", "\n").replace("\r", "\n").split("\n") if line.strip()]
+    cookie_lines = [line for line in lines if not line.startswith("#")]
+    domains = []
+    for line in cookie_lines:
+        parts = line.split("\t")
+        if parts:
+            domains.append(parts[0].lower())
+
+    return {
+        "line_count": len(lines),
+        "cookie_count": len(cookie_lines),
+        "domain_count": len(set(domains)),
+        "has_youtube": any("youtube.com" in domain for domain in domains),
+        "has_google": any("google.com" in domain for domain in domains),
+    }
+
+
 @dataclass(frozen=True)
 class Settings:
     youtube_api_key: str

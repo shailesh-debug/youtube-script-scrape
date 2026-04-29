@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
-from .config import get_settings
+from .config import get_settings, summarize_youtube_cookies
 from .models import JobStatus, ScrapeRequest, ScrapeResponse
 from .scraper import run_scrape_job
 
@@ -91,6 +91,7 @@ def health() -> dict[str, bool]:
         "youtube_api_key": bool(settings.youtube_api_key),
         "groq_api_key": bool(settings.groq_api_key),
         "youtube_cookies": bool(settings.youtube_cookies),
+        "youtube_cookies_summary": summarize_youtube_cookies(settings.youtube_cookies),
     }
 
 

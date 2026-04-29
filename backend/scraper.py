@@ -241,13 +241,22 @@ def _yt_dlp_failure_message(stderr: str) -> str:
     return text[:240]
 
 
-def _yt_dlp_base_args(cookie_path: Path | None = None) -> list[str]:
+YOUTUBE_EXTRACTOR_STRATEGIES = [
+    "youtube:player_client=android_vr;formats=missing_pot",
+    "youtube:player_client=android_vr",
+    "youtube:formats=missing_pot",
+    "youtube:player_client=ios;formats=missing_pot",
+    "youtube:player_client=mweb;formats=missing_pot",
+]
+
+
+def _yt_dlp_base_args(cookie_path: Path | None = None, extractor_args: str | None = None) -> list[str]:
     args = [
         sys.executable,
         "-m",
         "yt_dlp",
         "--extractor-args",
-        "youtube:player_client=android_vr;formats=missing_pot",
+        extractor_args or YOUTUBE_EXTRACTOR_STRATEGIES[0],
     ]
     if cookie_path:
         args.extend(["--cookies", str(cookie_path)])
@@ -319,27 +328,37 @@ def get_caption_transcript(video_id: str, tmpdir: str, cookies: str = "") -> str
 def download_audio(video_id: str, tmpdir: str, cookies: str = "") -> tuple[Path | None, str]:
     output = Path(tmpdir) / "audio.%(ext)s"
     cookie_path = _write_cookies_file(tmpdir, cookies)
-    cmd = [
-        *_yt_dlp_base_args(cookie_path),
-        "-f",
-        "bestaudio[ext=m4a]/bestaudio/best",
-        "--no-playlist",
-        "--no-warnings",
-        "-o",
-        str(output),
-        f"https://www.youtube.com/watch?v={video_id}",
-    ]
+    last_failure = "audio download failed"
 
-    result = subprocess.run(
-        cmd,
-        capture_output=True,
-        text=True,
-        timeout=180,
-    )
-    files = [Path(tmpdir) / name for name in os.listdir(tmpdir)]
-    ignored_names = {"youtube_cookies.txt"}
-    audio_path = next((path for path in files if path.is_file() and path.name not in ignored_names), None)
-    return audio_path, _yt_dlp_failure_message(result.stderr)
+    for strategy in YOUTUBE_EXTRACTOR_STRATEGIES:
+        for old_file in Path(tmpdir).glob("audio.*"):
+            old_file.unlink(missing_ok=True)
+
+        cmd = [
+            *_yt_dlp_base_args(cookie_path, strategy),
+            "-f",
+            "bestaudio[ext=m4a]/bestaudio/best",
+            "--no-playlist",
+            "--no-warnings",
+            "-o",
+            str(output),
+            f"https://www.youtube.com/watch?v={video_id}",
+        ]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+        files = [Path(tmpdir) / name for name in os.listdir(tmpdir)]
+        ignored_names = {"youtube_cookies.txt"}
+        audio_path = next((path for path in files if path.is_file() and path.name not in ignored_names), None)
+        if audio_path:
+            return audio_path, ""
+        last_failure = f"{strategy}: {_yt_dlp_failure_message(result.stderr)}"
+
+    return None, last_failure
 
 
 def transcribe_with_groq(video_id: str, groq_api_key: str, youtube_cookies: str = "") -> str:
