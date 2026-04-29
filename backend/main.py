@@ -85,7 +85,7 @@ async def run_job(job: Job, request: ScrapeRequest) -> None:
 
 
 @app.get("/health")
-def health() -> dict[str, bool]:
+def health() -> dict[str, Any]:
     return {
         "ok": True,
         "youtube_api_key": bool(settings.youtube_api_key),
