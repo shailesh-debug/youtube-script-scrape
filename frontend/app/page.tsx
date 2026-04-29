@@ -22,7 +22,17 @@ type JobStatus = {
   } | null;
 };
 
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const deployedApiBaseUrl = "https://youtube-script-scrape-api.onrender.com";
+
+function getApiBaseUrl() {
+  if (process.env.NEXT_PUBLIC_API_BASE_URL) {
+    return process.env.NEXT_PUBLIC_API_BASE_URL;
+  }
+  if (typeof window !== "undefined" && window.location.hostname === "localhost") {
+    return "http://localhost:8000";
+  }
+  return deployedApiBaseUrl;
+}
 
 export default function Dashboard() {
   const [channelUrl, setChannelUrl] = useState("");
@@ -33,6 +43,7 @@ export default function Dashboard() {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const apiBaseUrl = getApiBaseUrl();
 
   useEffect(() => {
     const saved = window.localStorage.getItem("yt-dashboard-password");

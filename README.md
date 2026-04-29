@@ -49,6 +49,35 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 ## Deployment Notes
 
-- Backend target: Render or another Python host with `ffmpeg` available for `yt-dlp` audio extraction.
-- Frontend target: Vercel.
+- Backend target: Render Docker web service from `render.yaml`.
+- Frontend target: Vercel project with Root Directory set to `frontend`.
 - Use host environment variables for keys and `APP_PASSWORD`; do not deploy `api.txt`.
+
+### Render Backend
+
+Create a Render Blueprint from this repository. Render will read `render.yaml` and prompt for:
+
+```bash
+YOUTUBE_API_KEY=...
+GROQ_API_KEY=...
+APP_PASSWORD=...
+```
+
+The expected backend URL is:
+
+```bash
+https://youtube-script-scrape-api.onrender.com
+```
+
+If Render assigns a different URL, use that URL in the Vercel frontend environment variable below.
+
+### Vercel Frontend
+
+Import the same GitHub repository into Vercel and set:
+
+```bash
+Root Directory: frontend
+NEXT_PUBLIC_API_BASE_URL=https://youtube-script-scrape-api.onrender.com
+```
+
+Every push to `main` redeploys the connected services.

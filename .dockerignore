@@ -1,0 +1,8 @@
+.git
+api.txt
+outputs
+frontend/node_modules
+frontend/.next
+__pycache__
+*.pyc
+*.log

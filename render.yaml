@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: youtube-script-scrape-api
+    runtime: docker
+    repo: https://github.com/shailesh-debug/youtube-script-scrape
+    branch: main
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+      - key: OUTPUT_DIR
+        value: /tmp/youtube-script-scrape/outputs
