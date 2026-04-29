@@ -47,6 +47,7 @@ class Settings:
     youtube_api_key: str
     groq_api_key: str
     app_password: str
+    youtube_cookies: str
     output_dir: Path
     max_jobs: int = 20
     max_scan_size: int = 120
@@ -61,5 +62,6 @@ def get_settings() -> Settings:
         youtube_api_key=_detect_key(api_lines, "YOUTUBE_API_KEY", ("AIza",)),
         groq_api_key=_detect_key(api_lines, "GROQ_API_KEY", ("gsk_",)),
         app_password=os.getenv("APP_PASSWORD", "change-me"),
+        youtube_cookies=os.getenv("YOUTUBE_COOKIES", ""),
         output_dir=output_dir,
     )

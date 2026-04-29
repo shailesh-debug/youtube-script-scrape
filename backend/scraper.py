@@ -219,41 +219,66 @@ def select_viral_videos(videos: list[dict], count: int) -> tuple[list[dict], dic
     }
 
 
-def download_audio(video_id: str, tmpdir: str) -> Path | None:
+def _write_cookies_file(tmpdir: str, cookies: str) -> Path | None:
+    if not cookies.strip():
+        return None
+
+    cookie_path = Path(tmpdir) / "youtube_cookies.txt"
+    cookie_path.write_text(cookies.strip() + "\n", encoding="utf-8")
+    return cookie_path
+
+
+def _yt_dlp_failure_message(stderr: str) -> str:
+    text = re.sub(r"\s+", " ", stderr).strip()
+    if "Sign in to confirm" in text or "not a bot" in text:
+        return "YouTube blocked anonymous audio download. Add YOUTUBE_COOKIES on Render."
+    if not text:
+        return "audio download failed"
+    return text[:240]
+
+
+def download_audio(video_id: str, tmpdir: str, cookies: str = "") -> tuple[Path | None, str]:
     output = Path(tmpdir) / "audio.%(ext)s"
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "yt_dlp",
-            "--extract-audio",
-            "--audio-format",
-            "mp3",
-            "--audio-quality",
-            "5",
-            "--no-playlist",
-            "--no-warnings",
-            "-o",
-            str(output),
-            f"https://www.youtube.com/watch?v={video_id}",
-        ],
+    cookie_path = _write_cookies_file(tmpdir, cookies)
+    cmd = [
+        sys.executable,
+        "-m",
+        "yt_dlp",
+        "--extract-audio",
+        "--audio-format",
+        "mp3",
+        "--audio-quality",
+        "5",
+        "--no-playlist",
+        "--no-warnings",
+        "-o",
+        str(output),
+        f"https://www.youtube.com/watch?v={video_id}",
+    ]
+    if cookie_path:
+        cmd[3:3] = ["--cookies", str(cookie_path)]
+
+    result = subprocess.run(
+        cmd,
         capture_output=True,
         text=True,
         timeout=180,
     )
     files = [Path(tmpdir) / name for name in os.listdir(tmpdir)]
-    return next((path for path in files if path.is_file()), None)
+    ignored_names = {"youtube_cookies.txt"}
+    audio_path = next((path for path in files if path.is_file() and path.name not in ignored_names), None)
+    return audio_path, _yt_dlp_failure_message(result.stderr)
 
 
-def transcribe_with_groq(video_id: str, groq_api_key: str) -> str:
+def transcribe_with_groq(video_id: str, groq_api_key: str, youtube_cookies: str = "") -> str:
     if not groq_api_key:
         return "[No transcript - Groq API key is not configured]"
 
     tmpdir = tempfile.mkdtemp()
     try:
-        audio_path = download_audio(video_id, tmpdir)
+        audio_path, failure_message = download_audio(video_id, tmpdir, youtube_cookies)
         if not audio_path:
-            return "[No transcript - audio download failed]"
+            return f"[No transcript - {failure_message}]"
 
         client = Groq(api_key=groq_api_key)
         with audio_path.open("rb") as audio:
@@ -479,7 +504,7 @@ def run_scrape_job(settings: Settings, channel_url: str, count: int, content_typ
     for index, video in enumerate(selected, 1):
         percent = 25 + int((index - 1) / max(len(selected), 1) * 55)
         progress("transcribing", percent, f"Transcribing video {index} of {len(selected)}.")
-        video["transcript"] = transcribe_with_groq(video["id"], settings.groq_api_key)
+        video["transcript"] = transcribe_with_groq(video["id"], settings.groq_api_key, settings.youtube_cookies)
         comments = get_top_comments(youtube, video["id"])
         video["comments"] = comments
         video["comment_summary"] = summarise_comments(comments)

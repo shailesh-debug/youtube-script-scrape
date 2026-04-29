@@ -15,5 +15,7 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      - key: YOUTUBE_COOKIES
+        sync: false
       - key: OUTPUT_DIR
         value: /tmp/youtube-script-scrape/outputs
