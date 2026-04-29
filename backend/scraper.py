@@ -247,7 +247,7 @@ def _yt_dlp_base_args(cookie_path: Path | None = None) -> list[str]:
         "-m",
         "yt_dlp",
         "--extractor-args",
-        "youtube:formats=missing_pot",
+        "youtube:player_client=android_vr;formats=missing_pot",
     ]
     if cookie_path:
         args.extend(["--cookies", str(cookie_path)])
@@ -323,11 +323,6 @@ def download_audio(video_id: str, tmpdir: str, cookies: str = "") -> tuple[Path 
         *_yt_dlp_base_args(cookie_path),
         "-f",
         "bestaudio[ext=m4a]/bestaudio/best",
-        "--extract-audio",
-        "--audio-format",
-        "mp3",
-        "--audio-quality",
-        "5",
         "--no-playlist",
         "--no-warnings",
         "-o",
