@@ -8,12 +8,22 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 API_TEXT_FILE = ROOT_DIR / "api.txt"
+YOUTUBE_COOKIES_FILE = ROOT_DIR / "youtube_cookies.txt"
 
 
 def _read_api_text_file() -> list[str]:
     if not API_TEXT_FILE.exists():
         return []
     return [line.strip() for line in API_TEXT_FILE.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _read_youtube_cookies() -> str:
+    env_value = os.getenv("YOUTUBE_COOKIES")
+    if env_value:
+        return env_value
+    if YOUTUBE_COOKIES_FILE.exists():
+        return YOUTUBE_COOKIES_FILE.read_text(encoding="utf-8")
+    return ""
 
 
 def _detect_key(lines: list[str], env_name: str, prefixes: tuple[str, ...]) -> str:
@@ -80,6 +90,6 @@ def get_settings() -> Settings:
         youtube_api_key=_detect_key(api_lines, "YOUTUBE_API_KEY", ("AIza",)),
         groq_api_key=_detect_key(api_lines, "GROQ_API_KEY", ("gsk_",)),
         app_password=os.getenv("APP_PASSWORD", "change-me"),
-        youtube_cookies=os.getenv("YOUTUBE_COOKIES", ""),
+        youtube_cookies=_read_youtube_cookies(),
         output_dir=output_dir,
     )

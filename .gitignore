@@ -3,6 +3,7 @@ __pycache__/
 .env
 .env.local
 api.txt
+youtube_cookies.txt
 .venv/
 venv/
 node_modules/

@@ -25,6 +25,14 @@ APP_PASSWORD=...
 YOUTUBE_COOKIES=...
 ```
 
+For local runs, you can also place a Netscape-format cookie export at:
+
+```bash
+youtube_cookies.txt
+```
+
+This file is ignored by Git.
+
 If environment variables are missing, it falls back to `api.txt`. The password defaults to `change-me` for local development unless `APP_PASSWORD` is set.
 
 ## Local Frontend
